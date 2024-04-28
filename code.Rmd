@@ -1,9 +1,15 @@
 ---
-title: "Midfielder Scoring Calculator"
+title: "Copa de la Liga 2024 - Midfielder Scoring Calculator"
+subtitle: "M9 Task - MSc Data Analytics in Football"
 author: "Tommy Las"
 date: "2024-04-28"
 output: html_document
 ---
+#Introduction
+
+Using a scoring calculator algorithm, we rank the best performing midfielders in Copa de La Liga 2024 Argentina.
+We import a CSV file with data from FBref, with only some modifications in columns names.
+The goal for this task is to clean the data, select the KPIs that are suitable for a defending midfielder, and apply a scoring algorithm to each player.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -11,17 +17,45 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Libraries
 
-```{r, warning=FALSE, message=FALSE, results='hide'}
+```{r libraries, warning=FALSE, message=FALSE, results='hide'}
 library(readr)
+library(tidyverse)
 ```
 
-
-
-# Read CSV file function
+# Read CSV file
 
 ``` {r csv}
 filename <- 'FBRef_2024_CopaDeLaLiga_MidfieldersAnalysis.csv'
 raw_data <- read_csv(filename)
 ```
 
+# Filter by position
 
+We want to filter our data by position, we want players whose main position is *MF*.
+
+``` {r filtering}
+raw_data <- raw_data %>% filter(Pos == "MF" | Pos == "MF,DF")
+```
+
+We check the unique positions in our dataset.
+
+``` {r}
+cat("The unique positions in our data:", unique(raw_data$Pos[1]), "and", raw_data$Pos[2])
+```
+
+# Data filtering
+
+Our next goal is to reduce our sample data. We want to filter players by *% minutes played*, *max age*. We are also selecting the features (metrics) that are specific for a defensive midfielder, reducing the number of columns.
+We create the _filter_data_ function
+
+``` {r data cleanup function}
+
+filter_data <- function(data, metrics, max_age, min_minutes_percentage ){
+  matches_played <- 90
+  minutes <- round((min_minutes_percentage*90*matches_played) / 100)
+  minutes
+  
+  
+}
+
+```
