@@ -34,13 +34,13 @@ raw_data <- read_csv(filename)
 We want to filter our data by position, we want players whose main position is *MF*.
 
 ``` {r filtering}
-raw_data <- raw_data %>% filter(Pos == "MF" | Pos == "MF,DF")
+raw_data <- raw_data %>% filter(Pos == "MF")
 ```
 
 We check the unique positions in our dataset.
 
 ``` {r}
-cat("The unique positions in our data:", unique(raw_data$Pos[1]), "and", raw_data$Pos[2])
+cat("The unique positions in our data:", unique(raw_data$Pos[1]))
 ```
 
 # Data filtering
@@ -51,11 +51,54 @@ We create the _filter_data_ function
 ``` {r data cleanup function}
 
 filter_data <- function(data, metrics, max_age, min_minutes_percentage ){
-  matches_played <- 90
-  minutes <- round((min_minutes_percentage*90*matches_played) / 100)
-  minutes
+  squad_matches_played <- 14 #copa de la liga matches before playoffs
+  data_filter <- data %>%
+    #Calculate the percentage a player played on their team, and compare to minimum percentage passed as parameter
+    filter(min_minutes_percentage <= ((as.numeric(Min) / (90*squad_matches_played)) *100), 
+           Age <= max_age) %>%
+    select(c("Player", "Squad", "Min", metrics))
   
-  
+  return (data_filter)
 }
 
 ```
+
+```{r}
+selected_metrics <- c("Progressive Passes", "Key Passes", "Interceptions", "Tackles" ,"Tackles Won", "Passes into Final Third", "Long Passes Attempted", "Long Passes Success %", "Total Passes Attempted", "Total Passes Success %","Total Blocks"  )
+#Get our filtered dataset
+filtered_data <- filter_data(raw_data, selected_metrics, 32, 30)
+
+```
+
+
+# Data Processing
+
+Numeric metrics in our dataframe are strings, we need to modify them as numeric
+
+```{r}
+
+filtered_data[, 3:ncol(filtered_data)] <- sapply(filtered_data[, 3:ncol(filtered_data)], as.numeric)
+
+```
+
+There are some metrics in our dataframe that are total values, we want to know these metrics within a 90 minute frame, since one player may play more minutes than another player. We divide the metric by the 90s column.
+
+```{r}
+
+metrics_modified <- c("Progressive Passes", "Key Passes", "Interceptions", "Tackles", "Tackles Won","Passes into Final Third", "Long Passes Attempted", "Total Passes Attempted", "Total Passes Success %")
+
+filtered_data[, metrics_modified] <- filtered_data[, metrics_modified] / (filtered_data$Min / 90)
+
+```
+
+We have "Tackles" and "Tackles Won" metrics, I want to create a "Tackle Success %" column
+
+``` {r}
+
+
+
+```
+
+# Scoring Calculator Algorithm
+
+
