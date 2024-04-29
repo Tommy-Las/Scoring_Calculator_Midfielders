@@ -95,10 +95,5 @@ We have "Tackles" and "Tackles Won" metrics, I want to create a "Tackle Success 
 
 ``` {r}
 
-
-
+filtered_data["Tackles Won %"] <- filtered_data["Tackles Won"] / filtered_data["Tackles"]
 ```
-
-# Scoring Calculator Algorithm
-
-
