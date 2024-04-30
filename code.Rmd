@@ -95,5 +95,37 @@ We have "Tackles" and "Tackles Won" metrics, I want to create a "Tackle Success 
 
 ``` {r}
 
-filtered_data["Tackles Won %"] <- filtered_data["Tackles Won"] / filtered_data["Tackles"]
+filtered_data["Tackles Won %"] <- (filtered_data["Tackles Won"] / filtered_data["Tackles"])*100
+```
+
+There some values that contain NA. We cannot make calculations with NA values, so I set all NA to 0
+``` {r}
+# Replace NA values with 0 in the entire dataframe
+filtered_data[is.na(filtered_data)] <- 0
+```
+# Scoring Calculator Algorithm
+
+Now that we filtered and processed the data, we create the scoring algorithm. We need to first normalize our data so every metric is on the same range. We use the min max normalizer.
+
+## Normalizing function
+``` {r normalizer}
+
+normalizer <- function(x, na.rm=TRUE){
+  return((x-min(x))/(max(x)-min(x)))
+}
+
+```
+
+## Normalize the metrics
+
+``` {r apply normalization}
+
+#Make a copy of the dataframe, so we can normalize the data and apply the scoring algorithm
+norm_data <- data.frame(filtered_data)
+
+for (i in 4:length(filtered_data)){
+  norm_data[,i] <- normalizer(filtered_data[,i])
+}
+
+#summary(norm_data)
 ```
