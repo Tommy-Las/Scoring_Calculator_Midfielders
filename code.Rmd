@@ -66,7 +66,7 @@ filter_data <- function(data, metrics, max_age, min_minutes_percentage ){
 ```{r}
 selected_metrics <- c("Progressive Passes", "Key Passes", "Interceptions", "Tackles" ,"Tackles Won", "Passes into Final Third", "Long Passes Attempted", "Long Passes Success %", "Total Passes Attempted", "Total Passes Success %","Total Blocks"  )
 #Get our filtered dataset
-filtered_data <- filter_data(raw_data, selected_metrics, 32, 30)
+filtered_data <- filter_data(raw_data, selected_metrics, 32, 40)
 
 ```
 
@@ -96,6 +96,11 @@ We have "Tackles" and "Tackles Won" metrics, I want to create a "Tackle Success 
 ``` {r}
 
 filtered_data["Tackles Won %"] <- (filtered_data["Tackles Won"] / filtered_data["Tackles"])*100
+
+#Drop tackles won since we have the % now
+
+filtered_data <- subset(filtered_data, select = -`Tackles Won`)
+
 ```
 
 There some values that contain NA. We cannot make calculations with NA values, so I set all NA to 0
@@ -103,9 +108,10 @@ There some values that contain NA. We cannot make calculations with NA values, s
 # Replace NA values with 0 in the entire dataframe
 filtered_data[is.na(filtered_data)] <- 0
 ```
-# Scoring Calculator Algorithm
 
-Now that we filtered and processed the data, we create the scoring algorithm. We need to first normalize our data so every metric is on the same range. We use the min max normalizer.
+# Normalization of the data
+
+Before the scoring algorithm and comparison between players, we need to first normalize our data so every metric is on the same range. We use the min max normalizer.
 
 ## Normalizing function
 ``` {r normalizer}
@@ -127,5 +133,52 @@ for (i in 4:length(filtered_data)){
   norm_data[,i] <- normalizer(filtered_data[,i])
 }
 
-#summary(norm_data)
+summary(norm_data)
+```
+
+# Scoring Calculator Algorithm
+
+Now that we filtered, processed and normalized the data, we create the scoring algorithm. 
+
+```{r}
+scoring_calculator <- function(data, weights, initial_index, columns_returned, n_players){
+  number_cols <- ncol(data)
+  
+  # Perform calcuation of each metric by multiplying by the given weight
+  for(i in initial_index:number_cols){
+    data[, i] <- data[,i] * weights[i-(initial_index-1)]
+  }
+  
+  #Sum all the scores
+  data$Score <- rowSums( data[, c(initial_index:number_cols) ] )
+  
+  #round score to 3 decimal places
+  data$Score <- round(10*data$Score, 3)
+  
+  #Order dataframe by score
+  data <- data[order(-data$Score), 
+               c(columns_returned, "Score")]
+  
+  rownames(data) <- 1:nrow(data)
+  
+  return(data[1:n_players,])
+}
+```
+
+
+``` {r}
+
+colnames(norm_data) # metrics
+
+df_score_midfielders <- scoring_calculator(
+  data = norm_data, 
+  weights = c(0.10, 0.05, 0.20, 0.20, 0.05, 0.015, 0.035, 
+              0.10, 0.10, 0.05, 0.10), 
+  initial_index = 4, 
+  columns_returned = c("Player", "Squad"), 
+  n_players = 10
+)
+
+df_score_midfielders
+
 ```
