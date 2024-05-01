@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libraries, warning=FALSE, message=FALSE, results='hide'}
 library(readr)
 library(tidyverse)
+
 ```
 
 # Read CSV file
@@ -50,7 +51,16 @@ We create the _filter_data_ function
 
 ``` {r data cleanup function}
 
-filter_data <- function(data, metrics, max_age, min_minutes_percentage ){
+# This function filters the data by given metrics, maximum age of players, and the minimum percentage of minutes player for its team  .
+# 
+# @param data data.frame: The dataset to be processed.
+# @param metrics character: A vector containing the metrics to be calculated.
+# @param max_age numeric: The maximum age threshold for filtering the data.
+# @param min_minutes_percentage numeric: The minimum percentage of minutes required for a player to be included.
+#
+# @return data.frame: The processed dataset.
+
+filter_data <- function(data, metrics, max_age, min_minutes_percentage ){ 
   squad_matches_played <- 14 #copa de la liga matches before playoffs
   data_filter <- data %>%
     #Calculate the percentage a player played on their team, and compare to minimum percentage passed as parameter
@@ -98,7 +108,6 @@ We have "Tackles" and "Tackles Won" metrics, I want to create a "Tackle Success 
 filtered_data["Tackles Won %"] <- (filtered_data["Tackles Won"] / filtered_data["Tackles"])*100
 
 #Drop tackles won since we have the % now
-
 filtered_data <- subset(filtered_data, select = -`Tackles Won`)
 
 ```
@@ -116,6 +125,13 @@ Before the scoring algorithm and comparison between players, we need to first no
 ## Normalizing function
 ``` {r normalizer}
 
+# Normalizes a numeric vector between 0 and 1.
+# 
+# @param x numeric: A numeric vector to be normalized.
+# @param na.rm logical: Indicates whether to remove NA values before normalization. Default is TRUE.
+#
+# @return numeric: The normalized vector.
+
 normalizer <- function(x, na.rm=TRUE){
   return((x-min(x))/(max(x)-min(x)))
 }
@@ -129,6 +145,7 @@ normalizer <- function(x, na.rm=TRUE){
 #Make a copy of the dataframe, so we can normalize the data and apply the scoring algorithm
 norm_data <- data.frame(filtered_data)
 
+#We start from index 4, the first numeric column
 for (i in 4:length(filtered_data)){
   norm_data[,i] <- normalizer(filtered_data[,i])
 }
@@ -141,6 +158,16 @@ summary(norm_data)
 Now that we filtered, processed and normalized the data, we create the scoring algorithm. 
 
 ```{r}
+# Calculates scores for players based on provided weights and data.
+# 
+# @param data data.frame: The dataset containing player metrics.
+# @param weights numeric: A vector of weights corresponding to each metric being calculated.
+# @param initial_index integer: The index of the first column where metrics start.
+# @param columns_returned character: A vector of column names indicating which columns to include in the final dataframe.
+# @param n_players integer: The total number of players we want to return, number of rows in the dataframe.
+#
+# @return numeric data.frame: Dataframe with best performing players based on the given metrics and weights. Sorted by Score descending.
+
 scoring_calculator <- function(data, weights, initial_index, columns_returned, n_players){
   number_cols <- ncol(data)
   
