@@ -4,4 +4,8 @@ R Program to create a ranking of best performing midfielders in Copa de la Liga 
 Read from the csv file, process the data, select key metrics, and create the ranking algortithm.
 
 R Libraries used:
-* test
+
+* tidyverse
+* fmsb
+* lsa
+* knitr
