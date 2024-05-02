@@ -5,7 +5,10 @@ author: "Tommy Las"
 date: "2024-04-28"
 output: html_document
 ---
-#Introduction
+
+
+
+# Introduction
 
 Using a scoring calculator algorithm, we rank the best performing midfielders in Copa de La Liga 2024 Argentina.
 We import a CSV file with data from FBref, with only some modifications in columns names.
@@ -18,16 +21,17 @@ knitr::opts_chunk$set(echo = TRUE)
 # Libraries
 
 ```{r libraries, warning=FALSE, message=FALSE, results='hide'}
-library(readr)
 library(tidyverse)
-
+library(fmsb)
+library(lsa)
+library(knitr)
 ```
 
 # Read CSV file
 
-``` {r csv}
+``` {r csv, message=FALSE}
 filename <- 'FBRef_2024_CopaDeLaLiga_MidfieldersAnalysis.csv'
-raw_data <- read_csv(filename)
+raw_data <- read_csv(filename, show_col_types = FALSE)
 ```
 
 # Filter by position
@@ -47,6 +51,7 @@ cat("The unique positions in our data:", unique(raw_data$Pos[1]))
 # Data filtering
 
 Our next goal is to reduce our sample data. We want to filter players by *% minutes played*, *max age*. We are also selecting the features (metrics) that are specific for a defensive midfielder, reducing the number of columns.
+
 We create the _filter_data_ function
 
 ``` {r data cleanup function}
@@ -73,17 +78,22 @@ filter_data <- function(data, metrics, max_age, min_minutes_percentage ){
 
 ```
 
-```{r}
+We select our metrics and call the filtered_data function
+
+```{r warning=FALSE, message=FALSE}
+
 selected_metrics <- c("Progressive Passes", "Key Passes", "Interceptions", "Tackles" ,"Tackles Won", "Passes into Final Third", "Long Passes Attempted", "Long Passes Success %", "Total Passes Attempted", "Total Passes Success %","Total Blocks"  )
 #Get our filtered dataset
 filtered_data <- filter_data(raw_data, selected_metrics, 32, 40)
+
+filtered_data <- as.data.frame(filtered_data)
 
 ```
 
 
 # Data Processing
 
-Numeric metrics in our dataframe are strings, we need to modify them as numeric
+Numeric metrics in our dataframe are strings, we need to modify them as numeric.
 
 ```{r}
 
@@ -95,9 +105,15 @@ There are some metrics in our dataframe that are total values, we want to know t
 
 ```{r}
 
-metrics_modified <- c("Progressive Passes", "Key Passes", "Interceptions", "Tackles", "Tackles Won","Passes into Final Third", "Long Passes Attempted", "Total Passes Attempted", "Total Passes Success %")
+metrics_modified <- c("Progressive Passes", "Key Passes", "Interceptions", "Tackles", "Tackles Won","Passes into Final Third", "Long Passes Attempted", "Total Passes Attempted")
 
 filtered_data[, metrics_modified] <- filtered_data[, metrics_modified] / (filtered_data$Min / 90)
+
+#Also modify names adding p90 at the end
+new_column_names <- paste0(metrics_modified, " p90")
+
+# Rename the columns in your dataframe
+colnames(filtered_data)[match(metrics_modified, colnames(filtered_data))] <- new_column_names
 
 ```
 
@@ -105,10 +121,10 @@ We have "Tackles" and "Tackles Won" metrics, I want to create a "Tackle Success 
 
 ``` {r}
 
-filtered_data["Tackles Won %"] <- (filtered_data["Tackles Won"] / filtered_data["Tackles"])*100
+filtered_data["Tackles Won %"] <- (filtered_data["Tackles Won p90"] / filtered_data["Tackles p90"])*100
 
 #Drop tackles won since we have the % now
-filtered_data <- subset(filtered_data, select = -`Tackles Won`)
+filtered_data <- subset(filtered_data, select = -`Tackles Won p90`)
 
 ```
 
@@ -122,7 +138,6 @@ filtered_data[is.na(filtered_data)] <- 0
 
 Before the scoring algorithm and comparison between players, we need to first normalize our data so every metric is on the same range. We use the min max normalizer.
 
-## Normalizing function
 ``` {r normalizer}
 
 # Normalizes a numeric vector between 0 and 1.
@@ -138,7 +153,7 @@ normalizer <- function(x, na.rm=TRUE){
 
 ```
 
-## Normalize the metrics
+Normalize the metrics by using the normalizer function.
 
 ``` {r apply normalization}
 
@@ -192,7 +207,21 @@ scoring_calculator <- function(data, weights, initial_index, columns_returned, n
 }
 ```
 
+We call the scoring_calculator function with the predefined parameters.
 
+Weights:
+ * `Progressive Passes`: 10%
+ * `Key Passes`: 5%
+ * `Interceptions`: 20%
+ * `Tackles`: 20%
+ * `Passes Final Third`: 5%
+ * `Long Passes Attempted`: 1.5%
+ * `Long Passes Success %`: 3.5%
+ * `Total Passes Attempted`: 10%
+ * `Total Passes Success %`: 10%
+ * `Total Blocks`: 5%
+ * `Tackles Won %`: 10%
+ 
 ``` {r}
 
 colnames(norm_data) # metrics
@@ -208,4 +237,140 @@ df_score_midfielders <- scoring_calculator(
 
 df_score_midfielders
 
+```
+
+We can see that the best performing midfielder based on the given KPIs and weights are Nicolas Fonseca from River Plate and Equi Fernandez from Boca Juniors.
+
+# Radar Chart Player Comparison
+
+We want to compare each players characteristics using a Radar Chart. Radar charts allows us to see which player performs better on a specific metric that the other player.
+
+First, we select the sample data of these two players.
+
+``` {r}
+
+#number of players to compare on the radar chart 
+n <- 2
+
+# Select the player names of the top 2 from the ranking
+players <- df_score_midfielders$Player[1:n]
+
+# Get their season data
+players_df <- filtered_data[filtered_data$Player %in% players,]
+
+#We select less KPIs to display on the radar chart.
+metrics_to_select <- c("Player", "Interceptions p90", "Tackles p90", "Tackles Won %","Long Passes Attempted p90", "Progressive Passes p90", "Total Passes Success %")
+players_df<- players_df[, metrics_to_select, drop = FALSE]
+
+players_df <- as.data.frame(players_df)
+
+```
+
+The first two rows of our radar chart dataframe need to be the minimum and maximum range for each metric. We do 95th and 5th percentiles between the midfielders we filtered first to avoid any outliers. 
+
+```{r}
+list_metrics <- c("Interceptions p90", "Tackles p90", "Tackles Won %","Long Passes Attempted p90", "Progressive Passes p90", "Total Passes Success %")
+
+#Do the min max calculation
+min_max_df <- rbind(
+  apply(filtered_data[, list_metrics], 2, function(x) quantile(x, probs=.95)), 
+  apply(filtered_data[, list_metrics], 2, function(x) quantile(x, probs=.05)))
+
+#set the row names to the percentiles
+rownames(min_max_df) <- c("p95", "p5")
+
+min_max_df
+
+```
+
+Are there any values above the 95th percentile or below the 5th percentile? We check and replace them with the 95th or 5th value.
+
+``` {r}
+for (p in players){
+  df_p <- players_df[players_df$Player == p,]
+  for (c in colnames(players_df)[2:ncol(players_df)])
+    {
+    value_c <- df_p[, c]
+    if (value_c < min_max_df["p5", c]){
+      players_df[
+        players_df$Player == p, c] = min_max_df["p5", c]
+    } else {
+      if (value_c > min_max_df["p95", c]){
+        players_df[
+          players_df$Player == p, c] = min_max_df["p95", c]
+      }
+    }
+  }
+}
+``` 
+
+We should not have any non numeric column in our table, so we set the row names to each player name and drop the Player column.
+``` {r}
+
+# Set row names using the "Player" column values
+rownames(players_df) <- players_df$Player
+# Remove the non-numeric column
+players_df <- players_df[, !names(players_df) %in% "Player"]
+
+```
+
+We combine the dataframe that contains the 95th and 5th percentiles, with the players dataframe. As I mentioned above, we need the first two rows to be the ranges of each metric for the radar chart. The first row is the max, the second the min.
+``` {r}
+
+df_final_plot <- rbind(
+  min_max_df, players_df[, list_metrics])
+
+df_final_plot
+
+````
+
+
+Next, we create a function for our radar chart:
+
+```{r radar chart}
+create_radarchart <- function(data, color = color, 
+                              vlabels = colnames(data), vlcex = 0.7,
+                              caxislabels = NULL, title = NULL){
+  radarchart(
+    data, axistype = 1,
+    # Polygon
+    pcol = color, pfcol = scales::alpha(color, 0.5), 
+    plwd = 2, plty = 1,
+    cglcol = "grey", cglty = 1, cglwd = 0.8,
+    # Axis
+    axislabcol = "white", 
+    # Labels
+    vlcex = vlcex, vlabels = vlabels,
+    caxislabels = caxislabels, title = title,
+  )
+}
+
+```
+
+We set up the parameters and then we call the "create_radarchart" function
+```{r}
+# Metric names in the radar plot
+metrics_name_plot <- c("Interceptions p90", "Tackles p90", "Tackles Won %","Long Passes Attempted p90", "Progressive Passes p90", "Total Passes Success %")
+
+# Colors for each player
+colors_radar <- c("#00AFBB", "#FC4E07")
+
+# Plot
+op <- par(mar = c(1, 2, 2, 2))
+create_radarchart(
+  data = df_final_plot, 
+  color = colors_radar,
+  vlabels = metrics_name_plot
+)
+
+legend("bottomleft", # position of legend
+       legend = rownames(players_df), # name players
+       horiz = FALSE, # position of legend
+       bty = 'n', pch = 20, 
+       col = colors_radar, 
+       text.col = "black", cex = 0.65, pt.cex = 1.75)
+title(
+  main = "Best 2 performing midfielders Copa de la Liga 2024", 
+  cex.main = 1, col.main = "#5D6D7E")
+```
 ```
